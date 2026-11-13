@@ -1,6 +1,8 @@
-// Supabase Auth configuration for RettMax Test.
-// The publishable/anon key is intended for browser use. Never put a service_role key here.
-window.RETTMAX_AUTH_CONFIG = {
-  supabaseUrl: "",
-  supabaseAnonKey: ""
+// Firebase Web App configuration for RettMax Test.
+// These browser values identify the Firebase app; never put service account keys here.
+window.RETTMAX_FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  appId: ""
 };
