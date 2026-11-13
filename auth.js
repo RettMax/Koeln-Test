@@ -91,9 +91,19 @@ function friendlyError(error) {
     "auth/weak-password": "Das Passwort ist zu schwach. Verwende mindestens 12 Zeichen.",
     "auth/too-many-requests": "Zu viele Versuche. Bitte warte kurz und versuche es erneut.",
     "auth/network-request-failed": "Keine Verbindung zu Firebase. Bitte prüfe deine Internetverbindung.",
-    "auth/unauthorized-domain": "Diese Website-Domain ist in Firebase noch nicht für Anmeldung freigegeben."
+    "auth/unauthorized-domain": "Diese Website-Domain ist in Firebase noch nicht für Anmeldung freigegeben.",
+    "auth/operation-not-allowed": "E-Mail-/Passwort-Anmeldung ist in Firebase nicht aktiviert. Aktiviere sie unter Authentication → Sign-in method.",
+    "auth/admin-restricted-operation": "Diese Registrierungsart ist in Firebase deaktiviert. Aktiviere E-Mail/Passwort unter Authentication → Sign-in method.",
+    "auth/invalid-api-key": "Der Firebase API-Key in auth-config.js ist ungültig.",
+    "auth/project-not-found": "Das Firebase-Projekt in auth-config.js wurde nicht gefunden. Prüfe projectId.",
+    "auth/app-not-authorized": "Diese Web-App ist für das Firebase-Projekt nicht autorisiert. Prüfe die Web-App-Konfiguration.",
+    "auth/configuration-not-found": "Firebase Authentication ist für dieses Projekt noch nicht eingerichtet."
   };
-  return messages[error.code] || "Die Anmeldung ist fehlgeschlagen. Bitte versuche es erneut.";
+  if (messages[error.code]) return messages[error.code];
+  console.error("Firebase Auth Fehler:", error);
+  return error.code
+    ? "Die Anmeldung ist fehlgeschlagen (Firebase-Fehlercode: " + error.code + ")."
+    : "Die Anmeldung ist fehlgeschlagen. Öffne die Browser-Konsole für Details.";
 }
 
 switchButton.addEventListener("click", () => {
