@@ -34,6 +34,7 @@ $("logout").onclick=()=>signOut(auth);
 $("resend").onclick=async()=>{try{await sendEmailVerification(currentUser);say("status","Bestätigungslink wurde gesendet.")}catch(e){say("status",e.message,true)}};
 function esc(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 async function render(user){
+ if(user){await user.reload();user=auth.currentUser;if(user.emailVerified)await user.getIdToken(true)}
  currentUser=user;$("signedOut").hidden=!!user;$("unverified").hidden=!user||user.emailVerified;$("app").hidden=!user||!user.emailVerified;$("logout").hidden=!user;
  $("accountLabel").textContent=user?(user.emailVerified?user.email:"E-Mail unbestätigt"):"Nicht angemeldet";
  if(!user||!user.emailVerified)return;
@@ -59,7 +60,7 @@ async function render(user){
   inviteBox.append(row)
  }
 }
-$("joinForm").onsubmit=async e=>{e.preventDefault();const slug=$("joinSlug").value.trim().toLowerCase();try{const s=await getDoc(doc(db,"servers",slug));if(!s.exists())throw Error("Server nicht gefunden.");if(s.data().visibility!=="public")throw Error("Dieser Server ist privat. Du brauchst eine Einladung.");await setDoc(doc(db,"users",currentUser.uid,"servers",slug),{role:"member",addedAt:serverTimestamp()});say("joinStatus","Server wurde hinzugefügt.");await render(currentUser)}catch(e){say("joinStatus",e.message,true)}};
+$("joinForm").onsubmit=async e=>{e.preventDefault();const slug=$("joinSlug").value.trim().toLowerCase();if(slug==="koeln"){say("joinStatus","RettMax Köln ist bereits als öffentlicher Server in deinem Dashboard verfügbar.");return}try{const s=await getDoc(doc(db,"servers",slug));if(!s.exists())throw Error("Server nicht gefunden.");if(s.data().visibility!=="public")throw Error("Dieser Server ist privat. Du brauchst eine Einladung.");await setDoc(doc(db,"users",currentUser.uid,"servers",slug),{role:"member",addedAt:serverTimestamp()});say("joinStatus","Server wurde hinzugefügt.");await render(currentUser)}catch(e){say("joinStatus",e.message,true)}};
 $("createForm").onsubmit=async e=>{e.preventDefault();const slug=$("serverSlug").value.trim().toLowerCase(),name=$("serverName").value.trim(),visibility=$("visibility").value;try{const ref=doc(db,"servers",slug);if((await getDoc(ref)).exists())throw Error("Diese Adresse ist bereits vergeben.");const b=writeBatch(db);b.set(ref,{name,slug,ownerUid:currentUser.uid,visibility,createdAt:serverTimestamp()});b.set(doc(db,"users",currentUser.uid,"servers",slug),{role:"owner",addedAt:serverTimestamp()});await b.commit();say("createStatus","Server erstellt.");$("createForm").reset();await render(currentUser)}catch(e){say("createStatus",e.message,true)}};
 if(auth)onAuthStateChanged(auth,user=>render(user).catch(e=>say("globalStatus",e.message,true)));else{$("signedOut").hidden=false;$("accountLabel").textContent="Firebase nicht konfiguriert"}
 </script></body></html>
