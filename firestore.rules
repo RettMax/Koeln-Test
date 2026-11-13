@@ -23,8 +23,12 @@ service cloud.firestore {
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.visibility in ['private','public'];
       allow update: if owner(slug)
+        && request.resource.data.keys().hasOnly(['name','slug','ownerUid','visibility','createdAt'])
         && request.resource.data.ownerUid == resource.data.ownerUid
-        && request.resource.data.slug == resource.data.slug;
+        && request.resource.data.slug == resource.data.slug
+        && request.resource.data.name is string && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 60
+        && request.resource.data.visibility in ['private','public'];
       allow delete: if owner(slug);
 
       match /invitations/{inviteId} {
@@ -58,7 +62,8 @@ service cloud.firestore {
           && request.resource.data.address is string
           && request.resource.data.note is string
           && request.resource.data.createdBy == request.auth.uid;
-        allow update, delete: if owner(slug);
+        allow update: if false;
+        allow delete: if owner(slug);
       }
     }
 
