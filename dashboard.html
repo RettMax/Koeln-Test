@@ -47,11 +47,11 @@ async function render(user){
   cards.push('<article class="server-card"><h3>'+esc(data.name)+'</h3><p>'+ (data.visibility==="private"?"Privater Server":"Öffentlicher Server")+' · /'+esc(slug)+'</p><a class="btn route" href="/'+encodeURIComponent(slug)+'">Server öffnen</a></article>');
  }
  serverBox.innerHTML=cards.join("");
- const iq=query(collectionGroup(db,"invitations"),where("targetEmail","==",user.email.toLowerCase()),where("status","==","pending"),limit(30));
+ const iq=query(collectionGroup(db,"invitations"),where("targetEmail","==",user.email.toLowerCase()),limit(30));
  const invitations=await getDocs(iq);
  if(invitations.empty)inviteBox.innerHTML='<p class="notice">Keine offenen Einladungen.</p>';
  for(const invitation of invitations.docs){
-  const inv=invitation.data(),slug=invitation.ref.parent.parent.id;
+  const inv=invitation.data();if(inv.status!=="pending")continue;const slug=invitation.ref.parent.parent.id;
   const sd=await getDoc(doc(db,"servers",slug));const name=sd.exists()?sd.data().name:slug;
   const row=document.createElement("div");row.className="invite";
   row.innerHTML='<div><strong>'+esc(name)+'</strong><div class="notice">Einladung für '+esc(user.email)+'</div></div><button class="btn route">Annehmen</button>';
