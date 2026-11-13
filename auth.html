@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080d18">
+  <title>Anmelden – RettMax Köln</title>
+  <link rel="stylesheet" href="style.css?v=5">
+</head>
+<body class="auth-page">
+  <header>
+    <div class="top">
+      <a class="brand auth-brand" href="index.html" aria-label="Zurück zu RettMax Köln">
+        <img src="RettMax.png" alt="" class="brand-logo">
+        <span>RettMax</span> Köln
+      </a>
+      <a class="auth-back" href="index.html">Zurück zur Übersicht</a>
+    </div>
+  </header>
+  <main class="auth-main">
+    <section class="auth-card" aria-labelledby="authTitle">
+      <p class="auth-kicker">RettMax 2.0 · Testversion</p>
+      <h1 id="authTitle">Willkommen bei RettMax</h1>
+      <p id="authIntro" class="auth-intro">Melde dich an oder erstelle ein Konto, um dein persönliches RettMax-Profil einzurichten.</p>
+
+      <div id="authConfigNotice" class="auth-notice" hidden>
+        Die Anmeldung ist noch nicht verbunden. Für den Test wird zuerst ein Supabase-Projekt benötigt.
+      </div>
+
+      <div id="authSession" class="auth-session" hidden>
+        <p>Du bist angemeldet als <strong id="authUserEmail"></strong>.</p>
+        <p id="authUserId" class="auth-user-id"></p>
+        <button id="signOutButton" class="btn copy" type="button">Abmelden</button>
+      </div>
+
+      <form id="authForm" class="auth-form" novalidate>
+        <label id="nameField" hidden for="displayName">Anzeigename</label>
+        <input id="displayName" name="displayName" type="text" autocomplete="name" placeholder="Dein Name" hidden>
+
+        <label for="email">E-Mail-Adresse</label>
+        <input id="email" name="email" type="email" autocomplete="email" placeholder="name@beispiel.de" required>
+
+        <label for="password">Passwort</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" minlength="12" placeholder="Mindestens 12 Zeichen" required>
+        <p id="passwordHint" class="auth-hint" hidden>Verwende mindestens 12 Zeichen.</p>
+
+        <label id="confirmField" hidden for="confirmPassword">Passwort wiederholen</label>
+        <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" placeholder="Passwort wiederholen" hidden>
+
+        <button id="submitAuth" class="btn route auth-submit" type="submit">Anmelden</button>
+        <p id="authStatus" class="auth-status" role="status" aria-live="polite"></p>
+      </form>
+
+      <button id="resetPassword" class="auth-text-button" type="button">Passwort vergessen?</button>
+      <div class="auth-switch">
+        <span id="switchPrompt">Noch kein Konto?</span>
+        <button id="switchMode" class="auth-text-button" type="button">Konto erstellen</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth-config.js"></script>
+  <script src="auth.js"></script>
+</body>
+</html>
