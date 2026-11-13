@@ -727,3 +727,20 @@ footer {
   .auth-main { padding-top: 4vh; }
   .auth-card { padding: 23px 19px; }
 }
+
+
+.auth-verification {
+  padding: 12px;
+  margin: 12px 0;
+  color: #fed7aa;
+  background: #27170b;
+  border: 1px solid #713f12;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.auth-verification .auth-text-button {
+  display: block;
+  margin-top: 6px;
+  text-align: left;
+}
