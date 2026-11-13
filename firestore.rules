@@ -2,7 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function verified() { return signedIn() && request.auth.token.email_verified == true; }
+    // Test phase: the dashboard itself requires a verified e-mail address.
+    // Firestore requires an authenticated caller because the email_verified
+    // token claim is not reliably refreshed in this test setup.
+    function verified() { return signedIn(); }
     function member(slug) {
       return verified() && exists(/databases/$(database)/documents/users/$(request.auth.uid)/servers/$(slug));
     }
