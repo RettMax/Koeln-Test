@@ -13,9 +13,16 @@ service cloud.firestore {
       return verified() &&
         get(/databases/$(database)/documents/servers/$(slug)).data.ownerUid == request.auth.uid;
     }
+    function serverExists(slug) {
+      return exists(/databases/$(database)/documents/servers/$(slug));
+    }
 
     match /servers/{slug} {
-      allow get: if resource.data.visibility == 'public' || member(slug);
+      // Signed-in users may check whether an unused slug is available.
+      // Existing private servers remain unreadable to non-members.
+      allow get: if (signedIn() && !serverExists(slug))
+        || resource.data.visibility == 'public'
+        || member(slug);
       allow list: if resource.data.visibility == 'public' || member(slug);
       allow create: if verified()
         && request.resource.data.keys().hasOnly(['name','slug','ownerUid','visibility','createdAt'])
