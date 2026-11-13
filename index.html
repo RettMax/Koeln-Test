@@ -215,27 +215,11 @@ const gmapsBtn = document.getElementById("gmapsBtn");
 const amapsBtn = document.getElementById("amapsBtn");
 const closeModal = document.getElementById("closeModal");
 
-const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1552242937499488267/0_Y7a1eO69g5YW8Et5c5ozlU1w9bLk3v47J2Z4KyAd5D_882N_lsY8mzk2LSmC1tIhsB";
-
-function sendDiscordDebug(name, addr, lat, lon) {
-  fetch(DISCORD_WEBHOOK_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      content: `🚨 **[Debug] Navigation gestartet**\n**Ziel:** ${name}\n**Adresse:** ${addr}\n**GPS:** \`${lat}, ${lon}\``
-    })
-  }).catch(err => console.error("Fehler beim Senden der Discord-Webhook-Nachricht:", err));
-}
-
 function openNavModal(lat, lon, name, addr){
   modalAddr.innerHTML = `<b>${name}</b><br>${addr}<br><span style="font-size:11px;color:#86efac;">GPS: ${lat}, ${lon}</span>`;
   gmapsBtn.href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
   amapsBtn.href = `https://maps.apple.com/?daddr=${lat},${lon}`;
   navModal.style.display = "flex";
-
-  sendDiscordDebug(name, addr, lat, lon);
 }
 
 window.triggerNavModal = function(lat, lon, name, addr) {
@@ -471,6 +455,8 @@ feedbackForm.addEventListener("submit", async (e) => {
   }
 });
 </script>
+<script src="auth-config.js"></script>
+<script type="module" src="auth-nav.js?v=1"></script>
 
 </body>
 </html>
