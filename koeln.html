@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="de" style="background-color: #080d18;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#080d18">
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="RettMax"> <!-- Name unter dem Icon -->
+
+  <link rel="apple-touch-icon" sizes="180x180" href="RettMax.png">
+
+  <link rel="icon" type="image/png" href="RettMax.png">
+
+  <title>RettMax Köln – Navigation</title>
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css?v=5">
+</head>
+ 
+<body style="background-color: #080d18;">
+
+<header>
+  <div class="top">
+    <div class="brand">
+      <img src="RettMax.png" alt="RettMax Logo" class="brand-logo" style="height: 32px; width: 32px; object-fit: contain;">
+      <span>RettMax</span> Köln
+    </div>
+    <div class="header-actions">
+      <div class="status">Offline-Daten</div>
+      <a class="auth-link" href="auth.html">Anmelden</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>Ziele schnell finden</h1>
+    <p>ZNA · Dialyse · Feuer- & Rettungswachen · weitere Ziele</p>
+  </section>
+
+  <div class="warning">
+    <b>Wichtig:</b> Diese Seite ist ein Navigations-/Adressverzeichnis und ersetzt keine rettungsdienstliche Zielentscheidung.
+    Vor dem Einsatz sollte die hinterlegte Anfahrtsadresse mit der aktuellen Vorgabe der jeweiligen Einrichtung abgeglichen werden.
+  </div>
+
+  <nav class="tabs" aria-label="Kategorien">
+    <button class="tab active" data-cat="ZNA">ZNA</button>
+    <button class="tab" data-cat="Dialyse">Dialyse</button>
+    <button class="tab" data-cat="Wachen">Wachen</button>
+    <button class="tab" data-cat="Weitere">Weitere</button>
+  </nav>
+
+  <div class="search-controls">
+    <input id="search" class="search" type="search" placeholder="Ziel, Stadtteil, Adresse oder Fachrichtung (z. B. Kardiologie) suchen …">
+    <button id="locationBtn" class="location-btn">Standort verwenden</button>
+  </div>
+  <div id="locationStatus" class="location-status">
+    Standort nicht freigegeben – Entfernung wird nicht berechnet.
+  </div>
+
+  <div id="grid" class="grid"></div>
+  <div id="empty" class="empty">Keine passenden Ziele gefunden.</div>
+
+  <section class="map-section">
+    <h2>Übersichtskarte</h2>
+    <p class="section-sub">Alle hinterlegten Rettungsdienstziele, Notaufnahmen und Wachen im Kölner Stadtgebiet auf einen Blick.</p>
+    
+    <div class="map-filters" id="mapFilters">
+      <label class="filter-chip">
+        <input type="checkbox" value="ZNA" checked>
+        <span class="badge-dot" style="background:#e11d48;"></span> ZNA / Kliniken
+      </label>
+      <label class="filter-chip">
+        <input type="checkbox" value="Dialyse" checked>
+        <span class="badge-dot" style="background:#0284c7;"></span> Dialyse
+      </label>
+      <label class="filter-chip">
+        <input type="checkbox" value="Wachen" checked>
+        <span class="badge-dot" style="background:#eab308;"></span> Wachen
+      </label>
+      <label class="filter-chip">
+        <input type="checkbox" value="Weitere" checked>
+        <span class="badge-dot" style="background:#a855f7;"></span> Weitere
+      </label>
+    </div>
+
+    <div id="map"></div>
+  </section>
+
+  <section class="feedback-section">
+    <h2>Feedback & Fehler melden</h2>
+    <p class="section-sub">Fehlt ein Ziel oder hast du einen Fehler gefunden? Schick uns eine kurze Nachricht!</p>
+
+    <form id="feedbackForm" class="feedback-form">
+      <textarea id="feedbackText" placeholder="Deine Nachricht, Korrektur oder Vorschlag..." required></textarea>
+      <button type="submit" id="feedbackBtn" class="btn route">Feedback senden</button>
+      <div id="feedbackStatus" class="feedback-status"></div>
+    </form>
+  </section>
+</main>
+
+<div id="navModal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <h3>Navigations-App wählen</h3>
+    <div id="modalAddr" class="modal-addr"></div>
+    <div class="modal-buttons">
+      <a id="gmapsBtn" class="btn btn-gmaps" target="_blank" rel="noopener">Google Maps</a>
+      <a id="amapsBtn" class="btn btn-amaps" target="_blank" rel="noopener">Apple Maps</a>
+    </div>
+    <button id="closeModal" class="btn modal-close">Abbrechen</button>
+  </div>
+</div>
+
+<footer>
+  Datenstand: Deutsches Krankenhaus Verzeichnis / Leitstellendatenbank.
+</footer>
+
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+const data = [
+  {cat:"ZNA", name:"Uniklinik Köln – Zentrale Notaufnahme", area:"Lindenthal", addr:"Kerpener Str. 64, 50937 Köln", lat:50.92292223864161, lon:6.916368667068342, note:"Zentrale Notaufnahme.", src:"https://www.uk-koeln.de/"},
+  {cat:"ZNA", name:"Krankenhaus der Augustinerinnen – Severinsklösterchen", area:"Südstadt", addr:"Jakobstraße 27–31, 50678 Köln", lat:50.92525870832905, lon:6.956098042880355, note:"Zentrale Notaufnahme.", src:"https://www.severinskloesterchen.de/"},
+  {cat:"ZNA", name:"Cellitinnen-Krankenhaus St. Franziskus", area:"Ehrenfeld", addr:"Schönsteinstraße 63, 50825 Köln", lat:50.95438987999637, lon:6.9185825477763245, note:"Zentrale Notaufnahme.", src:"https://www.stfranziskus.de/"},
+  {cat:"ZNA", name:"Cellitinnen-Krankenhaus Heilig Geist", area:"Longerich", addr:"Graseggerstraße 105, 50737 Köln", lat:50.99259425511963, lon:6.9253353984384445, note:"Zentrale Notaufnahme.", src:"https://www.cellitinnenhaeuser.de/"},
+  {cat:"ZNA", name:"Cellitinnen-Krankenhaus St. Hildegardis", area:"Lindenthal", addr:"Bachemer Str. 29–33, 50931 Köln", lat:50.9311852173975, lon:6.924851444354543, note:"Zentrale Notaufnahme.", src:"https://kliniknrw.de/"},
+  {cat:"ZNA", name:"Cellitinnen-Krankenhaus St. Vinzenz", area:"Nippes", addr:"Merheimer Str. 221–223, 50733 Köln", lat:50.96640903370674, lon:6.945449767167576, note:"Zentrale Notaufnahme.", src:"https://kliniknrw.de/"},
+  {cat:"ZNA", name:"Cellitinnen-Krankenhaus St. Antonius", area:"Bayenthal", addr:"Schillerstraße 23, 50968 Köln", lat:50.91076516903556, lon:6.965919620165635, note:"Zentrale Notaufnahme.", src:"https://www.cellitinnenhaeuser.de/"},
+  {cat:"ZNA", name:"Krankenhaus Köln-Merheim", area:"Merheim", addr:"Ostmerheimer Str. 200, 51109 Köln", lat:50.93928370803274, lon:7.050980414959772, note:"Zentrale Notaufnahme.", src:"https://www.kliniken-koeln.de/"},
+  {cat:"ZNA", name:"Krankenhaus Köln-Holweide", area:"Holweide", addr:"Neufelder Str. 32, 51067 Köln", lat:50.96811041227369, lon:7.057477637262467, note:"Zentrale Notaufnahme.", src:"https://www.kliniken-koeln.de/"},
+  {cat:"ZNA", name:"Kinderkrankenhaus Amsterdamer Straße", area:"Niehl", addr:"Amsterdamer Str. 59, 50735 Köln", lat:50.96282191795978, lon:6.968082321751901, note:"Pädiatrische Notaufnahme / Kinderklinik.", src:"https://www.kliniken-koeln.de/"},
+  {cat:"ZNA", name:"Krankenhaus Porz am Rhein", area:"Porz", addr:"Urbacher Weg 19, 51149 Köln", lat:50.89319826982881, lon:7.05126170995884, note:"Zentrale Notaufnahme.", src:"https://www.kh-porz.de/"},
+  {cat:"ZNA", name:"St. Elisabeth-Krankenhaus Köln-Hohenlind", area:"Lindenthal", addr:"Werthmannstraße 1, 50935 Köln", lat:50.924135204538366, lon:6.897478143101046, note:"Zentrale Notaufnahme.", src:"https://www.hohenlind.de/"},
+  {cat:"ZNA", name:"St. Marien-Hospital Köln", area:"Innenstadt", addr:"Kunibertskloster 11–13, 50668 Köln", lat:50.94802132932269, lon:6.9627386113183585, note:"Zentrale Notaufnahme.", src:"https://www.st-marien-hospital.de/"},
+  {cat:"ZNA", name:"Evangelisches Krankenhaus Köln-Kalk", area:"Kalk", addr:"Buchforststraße 2, 51103 Köln", lat:50.940564800021995, lon:7.009114634510572, note:"Zentrale Notaufnahme.", src:"https://www.evkk.de/"},
+  {cat:"ZNA", name:"Eduardus-Krankenhaus Köln", area:"Deutz", addr:"Custodisstraße 3–17, 50679 Köln", lat:50.93340212848803, lon:6.981755420761927, note:"Zentrale Notaufnahme.", src:"https://www.eduardus.de/"},
+  {cat:"ZNA", name:"LVR-Klinik Köln", area:"Merheim", addr:"Wilhelm-Griesinger-Straße 23, 51109 Köln", lat:50.93612422966737, lon:7.052211908391335, note:"Psychiatrische Notfallaufnahme.", src:"https://klinik-koeln.lvr.de/"},
+
+  {cat:"Dialyse", name:"KfH-Nierenzentrum Köln-Porz", area:"Porz", addr:"Urbacher Weg 19, 51149 Köln", lat:50.89320024391656, lon:7.050238988082212, note:"KfH Dialysezentrum.", src:"https://www.kfh.de/"},
+  {cat:"Dialyse", name:"KfH-Nierenzentrum Köln-Bayenthal", area:"Bayenthal", addr:"Bernhardstr. 110, 50968 Köln", lat:50.90999917221081, lon:6.967746715448602, note:"KfH Dialysezentrum.", src:"https://www.kfh.de/"},
+  {cat:"Dialyse", name:"KfH-Nierenzentrum Köln-Mülheim", area:"Mülheim", addr:"Böckingstr. 54–56, 51063 Köln", lat:50.9712669045908, lon:7.005393730492668, note:"KfH Dialysezentrum.", src:"https://www.kfh.de/"},
+  {cat:"Dialyse", name:"KfH-Nierenzentrum Köln-Merheim", area:"Merheim", addr:"Ostmerheimer Str. 200, 51109 Köln", lat:50.93859118706077, lon:7.050925315236613, note:"KfH Dialysezentrum.", src:"https://www.kfh.de/"},
+
+  {cat:"Wachen", name:"Feuer- und Rettungswache 1 Innenstadt", area:"Innenstadt", addr:"Agrippastraße 18, 50676 Köln", lat:50.934126292360574, lon:6.953771954754972, note:"Berufsfeuerwehr Köln.", src:"https://www.feuerwehr-nrw.de/koeln"},
+  {cat:"Wachen", name:"Feuer- und Rettungswache 4 Ehrenfeld", area:"Ehrenfeld", addr:"Äußere Kanalstraße 67, 50827 Köln", lat:50.957671270758574, lon:6.903821956535165, note:"Berufsfeuerwehr Köln.", src:"https://www.feuerwehr-nrw.de/koeln"},
+  {cat:"Wachen", name:"DRK Köln Rettungswache OJS", area:"Ehrenfeld", addr:"Oskar-Jäger-Straße 40, 50825 Köln", lat:50.94094815352936, lon:6.909884110613223, note:"Deutsches Rotes Kreuz.", src:"https://www.feuerwehr-nrw.de/koeln"},
+
+  {cat:"Weitere", name:"Uniklinik – Bettenhaus", area:"Lindenthal", addr:"Joseph-Stelzmann-Str. 22, 50931 Köln", lat:50.924555710281275, lon:6.920347749250396, note:"Bettenhaus / Herzzentrum / CIO", src:"https://www.uk-koeln.de/"},
+  {cat:"Weitere", name:"Uniklinik – Anfahrt 1", area:"Lindenthal", addr:"Joseph-Stelzmann-Str. 50, 50931 Köln", lat:50.925939084197694, lon:6.919528762258705, note:"HNO / Augen", src:"https://www.uk-koeln.de/"},
+  {cat:"Weitere", name:"Uniklinik – Anfahrt 2", area:"Lindenthal", addr:"Joseph-Stelzmann-Str. 50, 50931 Köln", lat:50.92538604038235, lon:6.915177478374775, note:"Strahlen / Psych / Neuro / Kinder", src:"https://www.uk-koeln.de/"},
+  {cat:"Weitere", name:"Uniklinik – Frauenklinik", area:"Lindenthal", addr:"Robert-Koch-Str. 10, 50931 Köln", lat:50.92459392141122, lon:6.923215211085099, note:"Frauenklinik.", src:"https://www.uk-koeln.de/"},
+  {cat:"Weitere", name:"Alexianer Krankenhaus Köln", area:"Porz-Ensen", addr:"Kölner Straße 64, 51149 Köln", lat:50.897428678685, lon:7.042580905906541, note:"Haupteingang.", src:"https://www.alexianer-koeln.de/"}
+];
+
+const specialtyData = [
+  {name:"Uniklinik Köln", addr:"Kerpener Str. 62, 50937 Köln", lat:50.92292223864161, lon:6.916368667068342,
+   specialties:["Allgemeinmedizin","Anästhesiologie","Augenheilkunde","Chirurgie","Dermatologie","Gynäkologie","HNO","Innere Medizin","Kardiologie","Neurologie","Neurochirurgie","Nephrologie","Onkologie","Orthopädie","Psychiatrie","Urologie","Pädiatrie"]},
+  {name:"Krankenhaus Köln-Merheim", addr:"Ostmerheimer Str. 200, 51109 Köln", lat:50.93928370803274, lon:7.050980414959772,
+   specialties:["Anästhesiologie","Chirurgie","Gynäkologie","Innere Medizin","Kardiologie","Neurologie","Neurochirurgie","Orthopädie","Radiologie","Urologie","Traumazentrum","Pneumologie"]},
+  {name:"Krankenhaus Köln-Holweide", addr:"Neufelder Str. 32, 51067 Köln", lat:50.9711, lon:7.0378,
+   specialties:["Anästhesiologie","Chirurgie","Frauenheilkunde","Gynäkologie","Geburtshilfe","HNO","Innere Medizin","Kinder- und Jugendpsychiatrie","Radiologie","Urologie","Perinatalzentrum"]},
+  {name:"Kinderkrankenhaus Amsterdamer Straße", addr:"Amsterdamer Str. 59, 50735 Köln", lat:50.9658, lon:6.9686,
+   specialties:["Kinder- und Jugendmedizin","Kinderchirurgie","Kinderanästhesiologie","Kinderradiologie","Neonatologie","Pädiatrie","Pädiatrische Intensivmedizin"]},
+  {name:"Krankenhaus der Augustinerinnen – Severinsklösterchen", addr:"Jakobstraße 27–31, 50678 Köln", lat:50.9247, lon:6.9575,
+   specialties:["Anästhesiologie","Chirurgie","Gynäkologie","Geburtshilfe","Innere Medizin","Kardiologie","Neurologie","Orthopädie","Urologie"]},
+  {name:"Cellitinnen-Krankenhaus St. Franziskus", addr:"Schönsteinstraße 63, 50825 Köln", lat:50.95438987999637, lon:6.9185825477763245,
+   specialties:["Chirurgie","Geriatrie","Innere Medizin","Kardiologie","Orthopädie","Unfallchirurgie"]},
+  {name:"Cellitinnen-Krankenhaus Heilig Geist", addr:"Graseggerstraße 105, 50737 Köln", lat:50.9921, lon:6.9067,
+   specialties:["Chirurgie","Geriatrie","Innere Medizin","Kardiologie","Orthopädie","Unfallchirurgie"]},
+  {name:"Cellitinnen-Krankenhaus St. Vinzenz", addr:"Merheimer Str. 221–223, 50733 Köln", lat:50.9704, lon:6.9568,
+   specialties:["Chirurgie","Geriatrie","Innere Medizin","Kardiologie","Orthopädie","Unfallchirurgie"]},
+  {name:"Cellitinnen-Krankenhaus St. Hildegardis", addr:"Bachemer Str. 29–33, 50931 Köln", lat:50.9318, lon:6.9244,
+   specialties:["Chirurgie","Gynäkologie","Innere Medizin","Kardiologie","Onkologie","Orthopädie"]},
+  {name:"Cellitinnen-Krankenhaus St. Antonius", addr:"Schillerstraße 23, 50968 Köln", lat:50.9125, lon:6.9680,
+   specialties:["Innere Medizin","Kardiologie","Gastroenterologie","Diabetologie"]},
+  {name:"St. Elisabeth-Krankenhaus Köln-Hohenlind", addr:"Werthmannstraße 1, 50935 Köln", lat:50.9231, lon:6.9032,
+   specialties:["Anästhesiologie","Augenheilkunde","Chirurgie","Gynäkologie","Geburtshilfe","HNO","Innere Medizin","Radiologie","Urologie"]},
+  {name:"St. Marien-Hospital Köln", addr:"Kunibertskloster 11–13, 50668 Köln", lat:50.9463, lon:6.9602,
+   specialties:["Innere Medizin","Geriatrie","Pneumologie","Neurologie","Frührehabilitation"]},
+  {name:"Evangelisches Krankenhaus Köln-Kalk", addr:"Buchforststraße 2, 51103 Köln", lat:50.9372, lon:6.9961,
+   specialties:["Anästhesiologie","Chirurgie","Gynäkologie","Geburtshilfe","Innere Medizin","Kardiologie","Neurologie","Orthopädie","Unfallchirurgie"]},
+  {name:"Eduardus-Krankenhaus Köln", addr:"Custodisstraße 3–17, 50679 Köln", lat:50.9315, lon:6.9733,
+   specialties:["Orthopädie","Unfallchirurgie","Innere Medizin","Rheumatologie","Anästhesiologie"]},
+  {name:"St. Agatha Krankenhaus Köln-Niehl", addr:"Feldgärtenstraße 97, 50735 Köln", lat:50.9840, lon:6.9635,
+   specialties:["Chirurgie","Innere Medizin","Plastische Chirurgie","Psychiatrie","Seelische Gesundheit"]},
+  {name:"Krankenhaus Porz am Rhein", addr:"Urbacher Weg 19, 51149 Köln", lat:50.8792, lon:7.0620,
+   specialties:["Chirurgie","Gynäkologie","Innere Medizin","Kardiologie","Neurologie","Orthopädie","Urologie"]},
+  {name:"Krankenhaus Porz am Rhein – Kinderklinik", addr:"Urbacher Weg 19, 51149 Köln", lat:50.8792, lon:7.0620,
+   specialties:["Kinder- und Jugendmedizin","Neonatologie","Kinderchirurgie","Pädiatrie"]},
+  {name:"LVR-Klinik Köln", addr:"Wilhelm-Griesinger-Straße 23, 51109 Köln", lat:50.9472, lon:7.0511,
+   specialties:["Psychiatrie","Psychotherapie","Gerontopsychiatrie","Suchtbehandlung"]},
+  {name:"Alexianer Krankenhaus Köln", addr:"Kölner Straße 64, 51149 Köln", lat:50.8891, lon:7.0264,
+   specialties:["Psychiatrie","Psychotherapie","Gerontopsychiatrie","Neurologie","Suchtbehandlung"]},
+  {name:"Klinik Alteburger Straße", addr:"Alteburger Str. 8–12, 50678 Köln", lat:50.9208, lon:6.9605,
+   specialties:["Psychiatrie","Psychotherapie","Psychosomatik"]}
+];
+
+data.forEach(item => {
+  if (item.cat === "ZNA") {
+    const specMatch = specialtyData.find(s => 
+      item.name.toLowerCase().includes(s.name.toLowerCase()) || 
+      s.name.toLowerCase().includes(item.name.toLowerCase()) ||
+      (Math.abs(item.lat - s.lat) < 0.005 && Math.abs(item.lon - s.lon) < 0.005)
+    );
+    item.specialties = specMatch ? specMatch.specialties : [];
+  }
+});
+
+const navModal = document.getElementById("navModal");
+const modalAddr = document.getElementById("modalAddr");
+const gmapsBtn = document.getElementById("gmapsBtn");
+const amapsBtn = document.getElementById("amapsBtn");
+const closeModal = document.getElementById("closeModal");
+
+function openNavModal(lat, lon, name, addr){
+  modalAddr.innerHTML = `<b>${name}</b><br>${addr}<br><span style="font-size:11px;color:#86efac;">GPS: ${lat}, ${lon}</span>`;
+  gmapsBtn.href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+  amapsBtn.href = `https://maps.apple.com/?daddr=${lat},${lon}`;
+  navModal.style.display = "flex";
+}
+
+window.triggerNavModal = function(lat, lon, name, addr) {
+  openNavModal(lat, lon, name, addr);
+};
+
+closeModal.addEventListener("click", () => navModal.style.display = "none");
+gmapsBtn.addEventListener("click", () => navModal.style.display = "none");
+amapsBtn.addEventListener("click", () => navModal.style.display = "none");
+navModal.addEventListener("click", (e) => {
+  if (e.target === navModal) navModal.style.display = "none";
+});
+
+const map = L.map('map').setView([50.9375, 6.9603], 11);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_3u3g_1_f96f1132efea9e302ef77176', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  subdomains: 'abcd',
+  maxZoom: 19
+}).addTo(map);
+
+function getMarkerIcon(cat) {
+  let color = "#e11d48"; // ZNA: Rot
+  if (cat === "Dialyse") color = "#0284c7"; // Dialyse: Blau
+  else if (cat === "Wachen") color = "#eab308"; // Wachen: Gelb
+  else if (cat === "Weitere") color = "#a855f7"; // Weitere: Violett
+
+  const svgHtml = `
+    <svg width="26" height="38" viewBox="0 0 26 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M13 0C5.82 0 0 5.82 0 13C0 22.75 13 38 13 38C13 38 26 22.75 26 13C26 5.82 20.18 0 13 0Z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/>
+      <circle cx="13" cy="13" r="4.5" fill="#ffffff"/>
+    </svg>`;
+
+  return L.divIcon({
+    className: '',
+    html: svgHtml,
+    iconSize: [26, 38],
+    iconAnchor: [13, 38],
+    popupAnchor: [0, -34]
+  });
+}
+
+const categoryGroups = {
+  ZNA: L.layerGroup().addTo(map),
+  Dialyse: L.layerGroup().addTo(map),
+  Wachen: L.layerGroup().addTo(map),
+  Weitere: L.layerGroup().addTo(map)
+};
+
+data.forEach(loc => {
+  const popupHtml = `
+    <div class="map-popup-title">${loc.name}</div>
+    <div class="map-popup-addr">${loc.addr}</div>
+    <button class="btn route" style="width:100%;padding:8px;font-size:12px;" 
+      onclick="triggerNavModal(${loc.lat}, ${loc.lon}, '${loc.name.replace(/'/g, "\\'")}', '${loc.addr.replace(/'/g, "\\'")}')">
+      Navigation
+    </button>
+  `;
+
+  if (categoryGroups[loc.cat]) {
+    L.marker([loc.lat, loc.lon], { icon: getMarkerIcon(loc.cat) })
+      .bindPopup(popupHtml)
+      .addTo(categoryGroups[loc.cat]);
+  }
+});
+
+document.querySelectorAll('#mapFilters input[type="checkbox"]').forEach(checkbox => {
+  checkbox.addEventListener('change', (e) => {
+    const cat = e.target.value;
+    if (e.target.checked) {
+      map.addLayer(categoryGroups[cat]);
+    } else {
+      map.removeLayer(categoryGroups[cat]);
+    }
+  });
+});
+
+function normalizeText(v){
+  return v ? v.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"") : "";
+}
+
+function distanceKm(a,b,c,d){
+  const R=6371, rad=x=>x*Math.PI/180;
+  const dLat=rad(c-a), dLon=rad(d-b);
+  const x=Math.sin(dLat/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(x));
+}
+
+let userPosition = null;
+let category = "ZNA";
+
+const grid = document.getElementById("grid");
+const empty = document.getElementById("empty");
+const search = document.getElementById("search");
+const locationBtn = document.getElementById("locationBtn");
+const locationStatus = document.getElementById("locationStatus");
+
+function render(){
+  const q = normalizeText(search.value.trim());
+
+  let items = data.filter(x => {
+    if (x.cat !== category) return false;
+    if (!q) return true;
+
+    const matchName = normalizeText(x.name).includes(q);
+    const matchArea = normalizeText(x.area).includes(q);
+    const matchAddr = normalizeText(x.addr).includes(q);
+    const matchNote = normalizeText(x.note).includes(q);
+    const matchSpec = x.specialties ? x.specialties.some(s => normalizeText(s).includes(q)) : false;
+
+    return matchName || matchArea || matchAddr || matchNote || matchSpec;
+  });
+
+  if (userPosition) {
+    items = items.map(x => ({
+      ...x,
+      dist: distanceKm(userPosition.lat, userPosition.lon, x.lat, x.lon)
+    })).sort((a,b) => a.dist - b.dist);
+  }
+
+  grid.innerHTML = "";
+  empty.style.display = items.length ? "none" : "block";
+
+  items.forEach(x => {
+    const card = document.createElement("article");
+    card.className = "card";
+
+    let specsHtml = "";
+    if (x.specialties && x.specialties.length > 0) {
+      specsHtml = `<div class="specialty-list"><b>Fachrichtungen:</b> ${x.specialties.join(" · ")}</div>`;
+    }
+
+    card.innerHTML = `
+      <div class="area">${x.area}</div>
+      <h3>${x.name}</h3>
+      ${x.dist !== undefined ? `<div class="distance">${x.dist.toFixed(1)} km Luftlinie</div>` : ""}
+      <div class="addr">${x.addr}</div>
+      <div class="note">${x.note}</div>
+      ${specsHtml}
+      <div class="actions">
+        <button class="btn route nav-btn" data-lat="${x.lat}" data-lon="${x.lon}" data-name="${x.name.replace(/"/g, '&quot;')}" data-addr="${x.addr.replace(/"/g, '&quot;')}">Navigation</button>
+        <button class="btn copy" data-address="${x.addr.replace(/"/g, '&quot;')}">Adresse kopieren</button>
+      </div>`;
+    grid.appendChild(card);
+  });
+
+  grid.querySelectorAll(".nav-btn").forEach(btn => btn.addEventListener("click", () => {
+    openNavModal(btn.dataset.lat, btn.dataset.lon, btn.dataset.name, btn.dataset.addr);
+  }));
+
+  grid.querySelectorAll(".copy").forEach(btn => btn.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(btn.dataset.address);
+    const old = btn.textContent;
+    btn.textContent = "Kopiert";
+    setTimeout(() => btn.textContent = old, 1000);
+  }));
+}
+
+locationBtn.addEventListener("click", () => {
+  if (!navigator.geolocation) {
+    locationStatus.textContent = "Dieser Browser unterstützt keine Standortabfrage.";
+    return;
+  }
+  locationStatus.textContent = "Standort wird abgefragt …";
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      userPosition = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      locationStatus.textContent = "Standort aktiv – Ergebnisse werden nach Entfernung sortiert.";
+      render();
+    },
+    () => {
+      locationStatus.textContent = "Standort konnte nicht abgerufen werden.";
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+  );
+});
+
+document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  category = btn.dataset.cat;
+  search.value = "";
+  render();
+}));
+
+search.addEventListener("input", render);
+render();
+
+// ==========================================
+// NTFY.SH PUSH BENACHRICHTIGUNG
+// ==========================================
+const NTFY_URL = "https://ntfy.sh/rettmax_koeln_feedback";
+
+const feedbackForm = document.getElementById("feedbackForm");
+const feedbackText = document.getElementById("feedbackText");
+const feedbackBtn = document.getElementById("feedbackBtn");
+const feedbackStatus = document.getElementById("feedbackStatus");
+
+feedbackForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const message = feedbackText.value.trim();
+
+  if (!message) return;
+
+  feedbackBtn.disabled = true;
+  feedbackBtn.textContent = "Wird gesendet…";
+  feedbackStatus.textContent = "";
+
+  try {
+    const response = await fetch(NTFY_URL, {
+      method: "POST",
+      body: message,
+      headers: {
+        "Title": "Neues RettMax Feedback",
+        "Icon": "https://ibb.co/VW7VjKvH",
+        "Tags": "ambulance"
+      }
+    });
+
+    if (response.ok) {
+      feedbackStatus.className = "feedback-status success";
+      feedbackStatus.textContent = "Vielen Dank! Dein Feedback wurde erfolgreich gesendet.";
+      feedbackText.value = "";
+    } else {
+      throw new Error("Fehler beim Senden");
+    }
+  } catch (err) {
+    feedbackStatus.className = "feedback-status error";
+    feedbackStatus.textContent = "Fehler beim Senden. Bitte versuche es später erneut.";
+  } finally {
+    feedbackBtn.disabled = false;
+    feedbackBtn.textContent = "Feedback senden";
+  }
+});
+</script>
+<script src="auth-config.js"></script>
+<script type="module" src="auth-nav.js?v=1"></script>
+
+</body>
+</html>
