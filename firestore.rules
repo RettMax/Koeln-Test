@@ -38,6 +38,24 @@ service cloud.firestore {
         allow delete: if owner(slug);
       }
     }
+    // Public directory is the only collection used for public discovery.
+    match /publicServers/{slug}{
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['name','slug','ownerUid','createdAt'])
+        && request.resource.data.name==getAfter(path(slug)).data.name
+        && request.resource.data.slug==slug
+        && request.resource.data.ownerUid==request.auth.uid
+        && getAfter(path(slug)).data.visibility=='public'
+        && request.resource.data.createdAt is timestamp;
+      allow update: if false;
+      allow delete: if owner(slug);
+    }
+    // Invitation inbox belongs to its recipient. It replaces collection-group scans.
+    match /users/{uid}/invitations/{inviteId}{
+      allow read: if signedIn() && request.auth.uid==uid;
+      allow create, update, delete: if false;
+    }
     match /users/{uid}/servers/{slug}{
       allow read: if signedIn()&&request.auth.uid==uid;
       allow create: if signedIn()&&request.auth.uid==uid&&validIndex(request.resource.data)&&existsAfter(/databases/$(database)/documents/servers/$(slug)/members/$(uid))&&((request.resource.data.role=='owner'&&getAfter(path(slug)).data.ownerUid==request.auth.uid)||(request.resource.data.role=='member'&&existsServer(slug)&&get(path(slug)).data.visibility=='public'));
