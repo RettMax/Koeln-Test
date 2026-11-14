@@ -19,6 +19,12 @@ service cloud.firestore {
       allow create: if signedIn() && !existsServer(slug) && validServer(request.resource.data,slug);
       allow update: if owner(slug) && validServer(request.resource.data,slug) && request.resource.data.ownerUid==resource.data.ownerUid && request.resource.data.slug==resource.data.slug && request.resource.data.createdAt==resource.data.createdAt;
       allow delete: if owner(slug);
+      match /members/{uid}{
+        allow read: if owner(slug)||(signedIn()&&request.auth.uid==uid);
+        allow create: if signedIn()&&request.auth.uid==uid&&request.resource.data.keys().hasOnly(['role','addedAt'])&&request.resource.data.keys().hasAll(['role','addedAt'])&&request.resource.data.role in ['owner','member']&&request.resource.data.addedAt is timestamp&&((request.resource.data.role=='owner'&&getAfter(path(slug)).data.ownerUid==request.auth.uid)||(request.resource.data.role=='member'&&existsServer(slug)&&get(path(slug)).data.visibility=='public'));
+        allow update: if false;
+        allow delete: if owner(slug)||(signedIn()&&request.auth.uid==uid);
+      }
       match /targets/{id}{
         allow read: if existsServer(slug) && (get(path(slug)).data.visibility=='public'||member(slug));
         allow create: if owner(slug)&&validTarget(request.resource.data);
@@ -34,7 +40,7 @@ service cloud.firestore {
     }
     match /users/{uid}/servers/{slug}{
       allow read: if signedIn()&&request.auth.uid==uid;
-      allow create: if signedIn()&&request.auth.uid==uid&&validIndex(request.resource.data)&&((request.resource.data.role=='owner'&&getAfter(path(slug)).data.ownerUid==request.auth.uid)||(request.resource.data.role=='member'&&existsServer(slug)&&get(path(slug)).data.visibility=='public')||(request.resource.data.role=='member'&&('inviteId' in request.resource.data)&&get(/databases/$(database)/documents/servers/$(slug)/invitations/$(request.resource.data.inviteId)).data.targetEmail==request.auth.token.email&&get(/databases/$(database)/documents/servers/$(slug)/invitations/$(request.resource.data.inviteId)).data.status=='pending'));
+      allow create: if signedIn()&&request.auth.uid==uid&&validIndex(request.resource.data)&&existsAfter(/databases/$(database)/documents/servers/$(slug)/members/$(uid))&&((request.resource.data.role=='owner'&&getAfter(path(slug)).data.ownerUid==request.auth.uid)||(request.resource.data.role=='member'&&existsServer(slug)&&get(path(slug)).data.visibility=='public'));
       allow update: if false;
       allow delete: if signedIn()&&request.auth.uid==uid;
     }
