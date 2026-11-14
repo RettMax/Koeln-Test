@@ -1,103 +1,43 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    // Test phase: the dashboard itself requires a verified e-mail address.
-    // Firestore requires an authenticated caller because the email_verified
-    // token claim is not reliably refreshed in this test setup.
-    function verified() { return signedIn(); }
-    function member(slug) {
-      return verified() && exists(/databases/$(database)/documents/users/$(request.auth.uid)/servers/$(slug));
-    }
-    function owner(slug) {
-      return verified() &&
-        get(/databases/$(database)/documents/servers/$(slug)).data.ownerUid == request.auth.uid;
-    }
-    function serverExists(slug) {
-      return exists(/databases/$(database)/documents/servers/$(slug));
-    }
-
-    match /servers/{slug} {
-      // Signed-in users may check whether an unused slug is available.
-      // Existing private servers remain unreadable to non-members.
-      allow get: if (signedIn() && !serverExists(slug))
-        || resource.data.visibility == 'public'
-        || member(slug);
-      allow list: if resource.data.visibility == 'public' || member(slug);
-      allow create: if verified()
-        && request.resource.data.keys().hasOnly(['name','slug','ownerUid','visibility','createdAt'])
-        && request.resource.data.name is string && request.resource.data.name.size() >= 1
-        && request.resource.data.name.size() <= 60
-        && request.resource.data.slug == slug
-        && slug.matches('^[a-z0-9-]{2,32}$')
-        && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.visibility in ['private','public'];
-      allow update: if owner(slug)
-        && request.resource.data.keys().hasOnly(['name','slug','ownerUid','visibility','createdAt'])
-        && request.resource.data.ownerUid == resource.data.ownerUid
-        && request.resource.data.slug == resource.data.slug
-        && request.resource.data.name is string && request.resource.data.name.size() >= 1
-        && request.resource.data.name.size() <= 60
-        && request.resource.data.visibility in ['private','public'];
+    // servers/{slug}: name, slug, ownerUid, visibility, description, createdAt
+    // targets: name, category, address, specialties, lat, lon, note, createdBy, createdAt
+    // user server index: role, addedAt, optional inviteId
+    function signedIn(){return request.auth != null;}
+    function path(slug){return /databases/$(database)/documents/servers/$(slug);}
+    function existsServer(slug){return exists(path(slug));}
+    function owner(slug){return signedIn() && existsServer(slug) && get(path(slug)).data.ownerUid==request.auth.uid;}
+    function member(slug){return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)/servers/$(slug));}
+    function short(v,min,max){return v is string && v.size()>=min && v.size()<=max;}
+    function validServer(d,slug){return d.keys().hasOnly(['name','slug','ownerUid','visibility','description','createdAt']) && d.keys().hasAll(['name','slug','ownerUid','visibility','description','createdAt']) && short(d.name,1,60) && d.slug==slug && slug.matches('^[a-z0-9-]{2,32}$') && d.ownerUid==request.auth.uid && d.visibility in ['private','public'] && short(d.description,0,240) && d.createdAt is timestamp;}
+    function validTarget(d){return d.keys().hasOnly(['name','category','address','specialties','lat','lon','note','createdBy','createdAt']) && d.keys().hasAll(['name','category','address','specialties','lat','lon','note','createdBy','createdAt']) && short(d.name,1,100) && d.category in ['ZNA','Dialyse','Wachen','Weitere'] && short(d.address,1,180) && d.specialties is list && d.specialties.size()<=20 && d.lat is number && d.lat>=-90 && d.lat<=90 && d.lon is number && d.lon>=-180 && d.lon<=180 && short(d.note,0,300) && d.createdBy==request.auth.uid && d.createdAt is timestamp;}
+    function validIndex(d){return d.keys().hasOnly(['role','addedAt','inviteId']) && d.keys().hasAll(['role','addedAt']) && d.role in ['owner','member'] && d.addedAt is timestamp && (!('inviteId' in d)||short(d.inviteId,1,128));}
+    match /servers/{slug}{
+      allow get: if (signedIn() && !existsServer(slug)) || (existsServer(slug) && (resource.data.visibility=='public'||member(slug)));
+      allow list: if signedIn() && resource.data.visibility=='public';
+      allow create: if signedIn() && !existsServer(slug) && validServer(request.resource.data,slug);
+      allow update: if owner(slug) && validServer(request.resource.data,slug) && request.resource.data.ownerUid==resource.data.ownerUid && request.resource.data.slug==resource.data.slug && request.resource.data.createdAt==resource.data.createdAt;
       allow delete: if owner(slug);
-
-      match /invitations/{inviteId} {
-        function inviteIsRecipient() {
-          return verified() && resource.data.targetEmail == request.auth.token.email;
-        }
-        allow get, list: if owner(slug) || inviteIsRecipient();
-        allow create: if owner(slug)
-          && request.resource.data.keys().hasOnly(['targetEmail','status','role','createdBy','createdAt'])
-          && request.resource.data.targetEmail is string
-          && request.resource.data.targetEmail.size() <= 254
-          && request.resource.data.status == 'pending'
-          && request.resource.data.role == 'member'
-          && request.resource.data.createdBy == request.auth.uid;
-        allow update: if inviteIsRecipient()
-          && resource.data.status == 'pending'
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','acceptedAt'])
-          && request.resource.data.status == 'accepted'
-          && existsAfter(/databases/$(database)/documents/users/$(request.auth.uid)/servers/$(slug));
+      match /targets/{id}{
+        allow read: if existsServer(slug) && (get(path(slug)).data.visibility=='public'||member(slug));
+        allow create: if owner(slug)&&validTarget(request.resource.data);
+        allow update: if owner(slug)&&validTarget(request.resource.data)&&request.resource.data.createdBy==resource.data.createdBy&&request.resource.data.createdAt==resource.data.createdAt;
         allow delete: if owner(slug);
       }
-
-      match /targets/{targetId} {
-        allow get, list: if get(/databases/$(database)/documents/servers/$(slug)).data.visibility == 'public' || member(slug);
-        allow create: if member(slug) && owner(slug)
-          && request.resource.data.keys().hasOnly(['name','category','address','note','createdBy','createdAt'])
-          && request.resource.data.name is string
-          && request.resource.data.name.size() >= 1
-          && request.resource.data.name.size() <= 100
-          && request.resource.data.category is string
-          && request.resource.data.address is string
-          && request.resource.data.note is string
-          && request.resource.data.createdBy == request.auth.uid;
-        allow update: if false;
+      match /invitations/{id}{
+        allow read: if owner(slug)||(signedIn()&&resource.data.targetEmail==request.auth.token.email);
+        allow create: if owner(slug)&&request.resource.data.keys().hasOnly(['targetEmail','status','role','createdBy','createdAt'])&&request.resource.data.keys().hasAll(['targetEmail','status','role','createdBy','createdAt'])&&short(request.resource.data.targetEmail,3,254)&&request.resource.data.status=='pending'&&request.resource.data.role=='member'&&request.resource.data.createdBy==request.auth.uid&&request.resource.data.createdAt is timestamp;
+        allow update: if signedIn()&&resource.data.targetEmail==request.auth.token.email&&resource.data.status=='pending'&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','acceptedAt'])&&request.resource.data.status=='accepted'&&request.resource.data.acceptedAt is timestamp&&existsAfter(/databases/$(database)/documents/users/$(request.auth.uid)/servers/$(slug));
         allow delete: if owner(slug);
       }
     }
-
-    match /users/{uid}/servers/{slug} {
-      allow get, list: if verified() && request.auth.uid == uid;
-      allow create: if verified() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['role','addedAt','inviteId'])
-        && request.resource.data.role in ['owner','member']
-        && (
-          (request.resource.data.role == 'owner' && verified() && getAfter(/databases/$(database)/documents/servers/$(slug)).data.ownerUid == request.auth.uid)
-          || (request.resource.data.role == 'member'
-            && get(/databases/$(database)/documents/servers/$(slug)).data.visibility == 'public')
-          || (request.resource.data.role == 'member' && request.resource.data.inviteId is string
-            && get(/databases/$(database)/documents/servers/$(slug)/invitations/$(request.resource.data.inviteId)).data.targetEmail == request.auth.token.email
-            && get(/databases/$(database)/documents/servers/$(slug)/invitations/$(request.resource.data.inviteId)).data.status == 'pending')
-        );
-      allow update: if verified() && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role','addedAt'])
-        && resource.data.role == 'member' && request.resource.data.role == 'member';
-      allow delete: if verified() && request.auth.uid == uid && resource.data.role == 'member';
+    match /users/{uid}/servers/{slug}{
+      allow read: if signedIn()&&request.auth.uid==uid;
+      allow create: if signedIn()&&request.auth.uid==uid&&validIndex(request.resource.data)&&((request.resource.data.role=='owner'&&getAfter(path(slug)).data.ownerUid==request.auth.uid)||(request.resource.data.role=='member'&&existsServer(slug)&&get(path(slug)).data.visibility=='public')||(request.resource.data.role=='member'&&('inviteId' in request.resource.data)&&get(/databases/$(database)/documents/servers/$(slug)/invitations/$(request.resource.data.inviteId)).data.targetEmail==request.auth.token.email&&get(/databases/$(database)/documents/servers/$(slug)/invitations/$(request.resource.data.inviteId)).data.status=='pending'));
+      allow update: if false;
+      allow delete: if signedIn()&&request.auth.uid==uid;
     }
-
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    match /{document=**}{allow read,write: if false;}
   }
 }
